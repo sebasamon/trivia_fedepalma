@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trivia Mundial – 54° Congreso Palmero</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Simple_green_background.jpg/1280px-Simple_green_background.jpg');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Fondo real: imagen subida por el usuario via base64 se inyecta por JS */
+  #bgCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    object-fit: cover;
+  }
+
+  .layer {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .card {
+    background: rgba(255,255,255,0.96);
+    color: #1a1a1a;
+    border-radius: 22px;
+    padding: 34px 30px;
+    width: 100%;
+    max-width: 600px;
+    box-shadow: 0 16px 50px rgba(0,0,0,0.45);
+    border-top: 6px solid #1a7a47;
+  }
+
+  h2 { color: #0a5c30; margin-bottom: 6px; font-size: 1.45rem; }
+  .subtitle { color: #555; font-size: 0.88rem; margin-bottom: 22px; line-height: 1.5; }
+
+  /* Lema del congreso arriba de la card */
+  .event-banner {
+    text-align: center;
+    margin-bottom: 14px;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .event-banner .lema {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .event-banner .lema span { color: #ffe066; }
+  .event-banner .congreso-name {
+    font-size: 0.78rem;
+    opacity: 0.9;
+    margin-top: 2px;
+  }
+
+  input[type=text] {
+    width: 100%;
+    padding: 13px 16px;
+    border: 2px solid #1a7a47;
+    border-radius: 10px;
+    font-size: 1rem;
+    outline: none;
+    margin-bottom: 14px;
+    transition: border-color 0.2s;
+    background: #f5fbf7;
+  }
+  input[type=text]:focus { border-color: #0a5c30; background: #fff; }
+
+  .btn {
+    background: linear-gradient(135deg, #1a7a47, #0a5c30);
+    color: #fff;
+    border: none;
+    padding: 13px 20px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.4px;
+  }
+  .btn:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-gold {
+    background: linear-gradient(135deg, #e8b800, #c49a00);
+    color: #fff;
+    margin-top: 10px;
+  }
+  .btn-outline {
+    background: transparent;
+    border: 2px solid #1a7a47;
+    color: #0a5c30;
+    margin-top: 10px;
+  }
+  .btn-outline:hover { background: #f0f9f4; }
+
+  /* Progress */
+  .prog-wrap {
+    background: #e0ede6;
+    border-radius: 8px;
+    height: 9px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .prog-bar {
+    background: linear-gradient(90deg, #1a7a47, #ffe066);
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.4s ease;
+  }
+
+  .score-chip {
+    display: inline-block;
+    background: linear-gradient(135deg, #1a7a47, #0a5c30);
+    color: #ffe066;
+    font-weight: 800;
+    padding: 5px 16px;
+    border-radius: 20px;
+    font-size: 0.88rem;
+    margin-bottom: 14px;
+  }
+  .q-num { font-size: 0.8rem; color: #888; margin-bottom: 3px; }
+  .q-text {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0a5c30;
+    margin-bottom: 18px;
+    line-height: 1.45;
+  }
+  .options { display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
+  .opt {
+    background: #f4fbf6;
+    border: 2px solid #c8e6d4;
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.96rem;
+    transition: all 0.16s;
+    text-align: left;
+    color: #1a1a1a;
+  }
+  .opt:hover:not(:disabled) { background: #d4f0e0; border-color: #1a7a47; transform: translateX(3px); }
+  .opt.correct { background: #d0f5e2 !important; border-color: #1a7a47 !important; color: #0a5c30; font-weight: 700; }
+  .opt.wrong   { background: #ffe4e4 !important; border-color: #d94444 !important; color: #b00; }
+  .opt:disabled { cursor: default; transform: none; }
+
+  .feedback {
+    font-weight: 700;
+    font-size: 0.96rem;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    border-radius: 9px;
+    line-height: 1.4;
+  }
+  .feedback.ok   { background: #d0f5e2; color: #0a5c30; }
+  .feedback.fail { background: #ffe4e4; color: #b00; }
+
+  /* Result */
+  .result-center { text-align: center; margin: 14px 0 22px; }
+  .big-score { font-size: 3.2rem; font-weight: 900; color: #0a5c30; line-height: 1; }
+  .big-score span { font-size: 1.6rem; color: #888; }
+  .result-meta { font-size: 0.9rem; color: #555; margin-top: 6px; }
+
+  /* Leaderboard table */
+  .lb-title { font-size: 1rem; font-weight: 800; color: #0a5c30; margin: 18px 0 10px; display: flex; align-items: center; gap: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.91rem; }
+  th { background: #0a5c30; color: #ffe066; padding: 8px 12px; text-align: left; font-size: 0.85rem; }
+  td { padding: 8px 12px; border-bottom: 1px solid #e8f3ec; }
+  tr:nth-child(even) td { background: #f4fbf6; }
+  tr.me td { background: #fffbe6 !important; font-weight: 700; }
+  .medal { font-size: 1.1rem; }
+  .empty { color: #aaa; font-size: 0.9rem; text-align: center; padding: 24px 0; }
+
+  .divider { height: 1px; background: #e0ede6; margin: 18px 0; }
+</style>
+</head>
+<body>
+
+<!-- Imagen de fondo inyectada desde JS -->
+<img id="bgCanvas" src="" alt="">
+
+<div class="layer">
+
+  <!-- Banner superior -->
+  <div class="event-banner">
+    <div class="lema">Más <span>palma.</span> Más <span>Colombia</span> ⚽</div>
+    <div class="congreso-name">54° Congreso Nacional de Cultivadores de Palma de Aceite 2026</div>
+  </div>
+
+  <div class="card" id="mainCard"></div>
+
+</div>
+
+<script>
+// ── Inyectar imagen de fondo ─────────────────────────────────────
+// La imagen del congreso se incrusta como data URI para no depender de URLs externas.
+// Usamos la imagen subida por el usuario (se referencia via blob/object URL si está disponible,
+// de lo contrario se usa un gradiente que imita el diseño del congreso).
+(function() {
+  const bg = document.getElementById('bgCanvas');
+  // Intentamos cargar la imagen del congreso; si no está disponible usamos CSS puro
+  bg.onerror = function() {
+    bg.style.display = 'none';
+    document.body.style.background =
+      'linear-gradient(160deg, #0a5c30 0%, #1a8a4a 40%, #0d6e3a 70%, #083d20 100%)';
+  };
+  // URL de la imagen del congreso (Fedepalma 54)
+  bg.src = 'https://i.imgur.com/oYmiT5l.png';
+})();
+
+// ── Banco de preguntas ───────────────────────────────────────────
+const allQuestions = [
+  {q:"¿Quién fue el primer ganador de la Copa Mundial de fútbol?",opts:["Argentina","Uruguay","Paraguay"],ans:1},
+  {q:"¿Qué país se negó a participar en la Copa del Mundo de 1950 porque no se permitió a sus jugadores jugar descalzos?",opts:["Sudáfrica","India","China"],ans:1},
+  {q:"¿En qué mundial se incorporaron los números en las camisetas?",opts:["Suecia 1958","Chile 1962","Suiza 1954"],ans:2},
+  {q:"¿Cuál fue el primer mundial en ser televisado?",opts:["Suiza 1954","Francia 1938","Uruguay 1936"],ans:0},
+  {q:"Brasil ganó TODOS los partidos de grupos y eliminatorias en México 70.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Quién es el jugador latino que más goles ha anotado en mundiales hasta el 2022?",opts:["Maradona","Ronaldo Nazário","Pelé"],ans:2},
+  {q:"¿En qué mundial por primera vez la final queda 0-0 y se define por penaltis?",opts:["Italia 1990","México 1986","Estados Unidos 1994"],ans:2},
+  {q:"Benito Mussolini amenazó a los jugadores de Italia con matarlos si no ganaban en 1934.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿En qué mundial aparece por primera vez la 'ola' en los estadios?",opts:["Italia 1990","Brasil 1960","México 1986"],ans:2},
+  {q:"Hasta el mundial de 2018, ¿cuántas veces Brasil ha sido campeón del mundo?",opts:["3 veces","5 veces","4 veces"],ans:1},
+  {q:"Francia le ganó por penaltis a Italia la final del mundial de Alemania 2006.",opts:["Verdadero","Falso"],ans:1},
+  {q:"¿Qué jugador ganó el Botín de Oro en el mundial del 2018?",opts:["James Rodríguez","Harry Kane","Romelu Lukaku"],ans:1},
+  {q:"¿De los siguientes países, quién se negó a ir al primer mundial?",opts:["Yugoslavia","Bélgica","Italia"],ans:2},
+  {q:"¿Cómo se llama el técnico que llevó a Colombia al mundial de 2014?",opts:["El Bolillo Gómez","Francisco Maturana","José Pékerman"],ans:2},
+  {q:"¿Qué país tenía que organizar el mundial de 1986 y tuvo que renunciar?",opts:["Colombia","México","Brasil"],ans:0},
+  {q:"¿Qué jugador ha ganado el mundial en 3 ocasiones?",opts:["Lionel Messi","Diego Maradona","Pelé"],ans:2},
+  {q:"En México 1970 se usó por primera vez un balón de color blanco y negro.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Qué país ha jugado más mundiales sin haber sido campeón hasta el 2026?",opts:["España","Brasil","México"],ans:2},
+  {q:"¿Quién quedó en tercer lugar en el mundial de 2010?",opts:["España","Alemania","Uruguay"],ans:2},
+  {q:"¿A qué equipo marcó James Rodríguez el mejor gol del mundial de Brasil 2014?",opts:["Brasil","Uruguay","Alemania"],ans:1},
+  {q:"¿Qué jugador ganó el Botín de Oro del mundial del 2002?",opts:["Ronaldo","Rivaldo","David Beckham"],ans:0},
+  {q:"¿Dónde se celebró la tercera Copa Mundial de fútbol?",opts:["Italia","Francia","España"],ans:0},
+  {q:"Diego Armando Maradona debutó en el mundial de Argentina 1978.",opts:["Verdadero","Falso"],ans:1},
+  {q:"¿Quién fue el ganador del partido conocido como el Maracanazo?",opts:["Brasil","Uruguay","Argentina"],ans:1},
+  {q:"¿Quién ganó la Copa Mundial de fútbol del 2014?",opts:["Alemania","Argentina","Brasil"],ans:0},
+  {q:"El emblema oficial de la Copa Mundial FIFA 2022 era de color blanco con azul.",opts:["Verdadero","Falso"],ans:1},
+  {q:"¿En qué copa mundial se utilizó por primera vez el árbitro de video (VAR)?",opts:["2014","2018","2010"],ans:1},
+  {q:"¿Qué equipos disputaron la final del mundial del 2018?",opts:["Brasil – Colombia","España – Uruguay","Francia – Croacia"],ans:2},
+  {q:"¿Cuál fue el total de goles en el mundial de 2006?",opts:["150 goles","161 goles","147 goles"],ans:1},
+  {q:"¿Qué jugador protagonizó un cabezazo en la final del mundial de Alemania 2006?",opts:["Miroslav Klose","Oliver Neuville","Zinedine Zidane"],ans:2},
+  {q:"Hasta el mundial de 2018, ¿cuántas veces España ha sido campeona del mundo?",opts:["4 veces","5 veces","1 vez"],ans:2},
+  {q:"¿Qué colombiano marcó un gol olímpico (tiro de esquina) en un mundial?",opts:["James Rodríguez","Marco Tulio Coll","Faustino Asprilla"],ans:1},
+  {q:"¿En qué mundial fue entregado el premio al juego limpio a la selección de Colombia?",opts:["Brasil 2014","Alemania 2006","Rusia 2018"],ans:2},
+  {q:"¿Quién ganó la Copa Mundial de fútbol del 2010?",opts:["Inglaterra","Argentina","España"],ans:2},
+  {q:"¿Qué jugador ganó el Botín de Oro del mundial de 2006?",opts:["Ronaldo","Miroslav Klose","David Beckham"],ans:1},
+  {q:"¿Cuántos goles se anotaron en total en el mundial de 2010?",opts:["190 goles","145 goles","201 goles"],ans:1},
+  {q:"¿Cómo se llama la mascota del mundial de Sudáfrica 2010?",opts:["Zakumi","Goleo","Willie"],ans:0},
+  {q:"Las siglas FIFA corresponden a: Federación Internacional de Fútbol Asociación.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Quién fue el mejor jugador (Balón de Oro) del mundial de 2018?",opts:["Lionel Messi","Luka Modric","Eden Hazard"],ans:1},
+  {q:"¿En qué año se jugó el primer torneo internacional organizado por la FIFA?",opts:["1960","1930","1906"],ans:1},
+  {q:"¿En qué mundial el pulpo Paul adquirió fama por sus predicciones?",opts:["México 1986","Sudáfrica 2010","Francia 1998"],ans:1},
+  {q:"¿En qué año fue la primera y única participación de Cuba en una Copa del Mundo?",opts:["Francia 1938","Suiza 1954","Brasil 2014"],ans:0},
+  {q:"¿Quién quedó en tercer lugar en el mundial de 2002?",opts:["Corea del Sur","Turquía","Colombia"],ans:1},
+  {q:"¿Quién fue el campeón del mundial de 2002?",opts:["Brasil","Alemania","China"],ans:0},
+  {q:"¿Dónde se disputó el mundial de 1998?",opts:["Francia","Brasil","México"],ans:0},
+  {q:"¿Quién es el jugador que ha estado en más partidos mundialistas hasta el 2022?",opts:["Lionel Messi","Gianluigi Buffon","Lothar Matthäus"],ans:0},
+  {q:"La FIFA presta apoyo financiero y logístico a sus 211 federaciones afiliadas.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿En qué mundial se llevó a cabo el gol llamado 'La mano de Dios'?",opts:["1990","1986","1998"],ans:1},
+  {q:"¿Cuántos goles ha marcado Colombia en todos los mundiales (sin penales) hasta el 2018?",opts:["30 goles","32 goles","36 goles"],ans:1},
+  {q:"¿Qué organismo realiza la Copa Mundial de fútbol?",opts:["UEFA","FIFA","Conmebol"],ans:1},
+  {q:"¿Qué jugador ganó el Botín de Oro del mundial de 2010?",opts:["Iker Casillas","Wesley Sneijder","Thomas Müller"],ans:2},
+  {q:"¿En qué año se celebrará el centenario de la primera Copa del Mundo?",opts:["2031","2028","2030"],ans:2},
+  {q:"¿Quiénes son los anfitriones principales del mundial 2030?",opts:["España, Marruecos y Portugal","Argentina, Uruguay y Paraguay","Arabia Saudita y Qatar"],ans:0},
+  {q:"¿Cuál es la única sede confirmada para el mundial del 2034?",opts:["China","Australia","Arabia Saudita"],ans:2},
+  {q:"¿Qué países debutaron en el mundial de Rusia 2018?",opts:["Brasil y Perú","Panamá e Islandia","Panamá y Paraguay"],ans:1},
+  {q:"¿Cómo se llamaba el balón del mundial de Brasil 2014?",opts:["Maracaná","Brazuca","Questra"],ans:1},
+  {q:"¿Qué rival derrotó por penales a Colombia en el mundial del 2018?",opts:["Inglaterra","Brasil","Estados Unidos"],ans:0},
+  {q:"¿En qué año fue la última participación de Colombia en la Copa Mundial hasta el 2020?",opts:["1998","2014","2018"],ans:2},
+  {q:"¿Quién marcó el primer gol de Colombia en su primer mundial en 1962?",opts:["Francisco Zuluaga","John Tréllez","Pablo Armero"],ans:0},
+  {q:"¿Cuántos mundiales jugó René Higuita con la selección colombiana?",opts:["1 mundial","2 mundiales","3 mundiales"],ans:1},
+  {q:"¿Quién fue el segundo máximo goleador de Colombia en el mundial de Brasil 2014?",opts:["Radamel Falcao","Jackson Martínez","Juan Guillermo Cuadrado"],ans:1},
+  {q:"Colombia declinó la realización del mundial de 1986 porque no podía cumplir las exigencias de la FIFA.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Quién fue el primer técnico de la selección colombiana en un mundial?",opts:["Hernán Darío Gómez","Carlos Bilardo","Adolfo Pedernera"],ans:2},
+  {q:"¿Qué confederación tendrá 1 plaza directa asegurada por primera vez en el mundial 2026?",opts:["AFC (Asia)","OFC (Oceanía)","Concacaf"],ans:1},
+  {q:"¿Cuántos grupos habrá en el nuevo formato del mundial 2026?",opts:["12 grupos de 4","16 grupos de 3","8 grupos de 6"],ans:1},
+  {q:"¿Qué país se convierte en 2026 en el primero en organizar tres Copas del Mundo masculinas?",opts:["Brasil","México","Alemania"],ans:1},
+  {q:"¿Por qué no se celebró la Copa Mundial en 1942 y 1946?",opts:["Primera guerra mundial","Virus de la gripe A","Segunda guerra mundial"],ans:2},
+  {q:"¿Por qué en el primer mundial la mayoría de los europeos no participaron?",opts:["Por no haberse celebrado en Europa","Los jugadores estaban enfermos","Altos costos en el viaje"],ans:2},
+  {q:"¿Cuál es el nombre de la primera mascota en la historia de los mundiales?",opts:["Willie","Juanito","Gauchito"],ans:0},
+  {q:"¿Qué país será sede del mundial femenino de la FIFA 2027?",opts:["Estados Unidos","Brasil","Alemania"],ans:1},
+  {q:"¿Cuántas selecciones participarán por primera vez en el mundial 2026?",opts:["48","32","40"],ans:0},
+  {q:"¿En qué ciudad se jugará la final del mundial 2026?",opts:["Los Ángeles","Nueva York / Nueva Jersey","Ciudad de México"],ans:1},
+  {q:"¿Cuál es el lema oficial de la candidatura de Arabia Saudita 2034?",opts:["Visión 2034","Football for all","Growing together"],ans:2},
+  {q:"¿Qué estadio de Dallas será sede de más partidos en el mundial 2026?",opts:["Cotton Bowl","AT&T Stadium","Toyota Stadium"],ans:1},
+  {q:"¿Qué confederación tendrá 9 plazas directas en el mundial 2026?",opts:["CAF (África)","UEFA (Europa)","AFC (Asia)"],ans:1},
+  {q:"¿Quién marcó el gol número 1000 en la historia de los mundiales?",opts:["Pelé","Maradona","Rob Rensenbrink"],ans:2},
+  {q:"¿En qué año ganó Brasil su tercera copa mundial?",opts:["Alemania 2006","Argentina 1978","México 1970"],ans:2},
+  {q:"¿Quién marcó el gol número 2000 en la historia de los mundiales?",opts:["Marcus Allbäck","Lukas Podolski","Zinedine Zidane"],ans:0},
+  {q:"¿Cuántas ciudades anfitrionas tiene el mundial 2026 en total?",opts:["20","12","16"],ans:2},
+  {q:"¿Cuál es la fecha exacta de la final del mundial 2026?",opts:["19 de julio de 2026","12 de julio de 2026","26 de julio de 2026"],ans:0},
+  {q:"¿En dónde se encuentra la sede de la FIFA?",opts:["París","Austria","Zúrich"],ans:2},
+  {q:"¿En qué año fue fundada la Confederación Asiática de Fútbol?",opts:["1960","1946","1954"],ans:2},
+  {q:"¿Quién fue el goleador del primer mundial Uruguay 1930?",opts:["Guillermo Stábile","Bigodes","Pelé"],ans:0},
+  {q:"¿Cuál es el número total de partidos del mundial 2026?",opts:["104","64","80"],ans:0},
+  {q:"¿Qué estadio albergará el partido inaugural del mundial 2026?",opts:["MetLife Stadium","SoFi Stadium","Estadio Azteca"],ans:2},
+  {q:"¿Cuántos países coorganizan el mundial masculino del 2026?",opts:["2","3","1"],ans:1},
+  {q:"En Sudáfrica 2010 fue la primera vez que el equipo organizador no pasó la primera fase.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Quién fue el mejor jugador del mundial de 2002?",opts:["Ronaldo","Oliver Kahn","Hong Myung-bo"],ans:1},
+  {q:"¿En qué estadio se disputó la final del mundial de 2014?",opts:["Arena Corinthians","Maracaná","Mineirão"],ans:1},
+  {q:"El gol más rápido de la historia mundialista lo marcó Hakan Şükür, 11 segundos después de iniciar.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Quién quedó en tercer lugar en el mundial de 2014?",opts:["Brasil","Países Bajos","Argentina"],ans:1},
+  {q:"¿En qué año se retransmitió por primera vez a color la Copa Mundial?",opts:["1950","1960","1970"],ans:2},
+  {q:"¿Quién es el máximo goleador de la historia de la Copa Mundial hasta el 2018?",opts:["Miroslav Klose","Guillermo Stábile","Ronaldo"],ans:0},
+  {q:"¿Cuál fue el total de goles en el mundial de 2018?",opts:["120 goles","169 goles","137 goles"],ans:2},
+  {q:"En Francia 1998 se definió un encuentro por primera vez con el sistema de 'Gol de oro'.",opts:["Verdadero","Falso"],ans:0},
+  {q:"Hasta el 2018, ¿en qué año Colombia tuvo la mejor participación en un mundial?",opts:["1998","2002","2014"],ans:2},
+  {q:"¿Cómo se llamó la mascota del mundial de España 1982?",opts:["Naranjito","Juanita","Pique"],ans:0},
+  {q:"¿Cuál fue el total de goles en el mundial de 2014?",opts:["187 goles","171 goles","190 goles"],ans:1},
+  {q:"¿Qué jugador ganó el Botín de Oro del mundial de 2014?",opts:["James Rodríguez","Santiago Arias","Neymar"],ans:0},
+  {q:"¿Qué país africano co-organizará el mundial 2030?",opts:["Egipto","Marruecos","Sudáfrica"],ans:1},
+  {q:"¿Cuál es el nombre del estadio en construcción en Casablanca para el mundial 2030?",opts:["Estadio Hassan II","Estadio de Marrakech","Gran Estadio de Rabat"],ans:0},
+  {q:"¿Cuántas plazas directas tendrá CONMEBOL para el mundial 2026?",opts:["5","4","6"],ans:2},
+  {q:"¿En qué mundial se usaron por primera vez las tarjetas amarillas y rojas?",opts:["Chile 1962","México 1970","Suecia 1958"],ans:1},
+  {q:"La FIFA casi desaparece luego de la primera guerra mundial.",opts:["Verdadero","Falso"],ans:0},
+  {q:"¿Cuáles fueron las dos últimas sedes de mundiales hasta el 2023?",opts:["Sudáfrica y Qatar","Brasil y Qatar","Rusia y Qatar"],ans:2},
+  {q:"¿Qué país ha jugado en cada edición del mundial de fútbol?",opts:["Alemania","Brasil","Argentina"],ans:1},
+  {q:"¿Qué ronda se añade en el formato de 48 equipos del mundial 2026?",opts:["Novenos de final","Dieciseisavos de final","Ronda de repechaje"],ans:1},
+  {q:"¿En qué ciudad se encuentra el estadio Centenario que celebrará los 100 años del mundial en 2030?",opts:["Montevideo","Asunción","Santiago"],ans:0},
+  {q:"¿Qué selección ha disputado más finales de la Copa del Mundo al 2025?",opts:["Brasil","Alemania","Argentina"],ans:2}
+];
+
+const STORAGE_KEY = 'trivia_54congreso_v1';
+
+let state = {
+  screen: 'welcome',
+  name: '',
+  questions: [],
+  current: 0,
+  score: 0,
+  answered: false,
+  selectedOpt: null
+};
+
+// ── Storage helpers ──────────────────────────────────────────────
+function loadLB() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+function saveLB(lb) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(lb)); } catch {}
+}
+
+// ── Utils ────────────────────────────────────────────────────────
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+// ── Render ───────────────────────────────────────────────────────
+function render() {
+  const card = document.getElementById('mainCard');
+  if (state.screen === 'welcome') card.innerHTML = welcomeHTML();
+  else if (state.screen === 'quiz')   card.innerHTML = quizHTML();
+  else if (state.screen === 'result') card.innerHTML = resultHTML();
+  else if (state.screen === 'lb')     card.innerHTML = lbHTML();
+  attachListeners();
+}
+
+function welcomeHTML() {
+  return `
+    <h2>⚽ Trivia Copa Mundial</h2>
+    <p class="subtitle">Pon a prueba tu conocimiento futbolero. Responde 5 preguntas al azar y compite con tus colegas del sector palmero.</p>
+    <label style="font-weight:700;color:#0a5c30;font-size:0.93rem;display:block;margin-bottom:6px;">¿Cuál es tu nombre?</label>
+    <input type="text" id="nameInput" placeholder="Escribe tu nombre aquí..." maxlength="40">
+    <button class="btn" id="startBtn">¡Empezar Trivia! ⚽</button>
+    <button class="btn btn-outline" id="lbBtn" style="margin-top:10px;">🏆 Ver Tabla de Líderes</button>
+  `;
+}
+
+function quizHTML() {
+  const q = state.questions[state.current];
+  const prog = (state.current / 5) * 100;
+  const optsHTML = q.opts.map((o, i) => {
+    let cls = 'opt';
+    if (state.answered) {
+      if (i === q.ans) cls += ' correct';
+      else if (i === state.selectedOpt) cls += ' wrong';
+    }
+    return `<button class="${cls}" data-i="${i}" ${state.answered?'disabled':''}>${String.fromCharCode(65+i)}. ${o}</button>`;
+  }).join('');
+
+  const feedbackHTML = state.answered
+    ? (state.selectedOpt === q.ans
+        ? `<div class="feedback ok">✅ ¡Correcto!</div>`
+        : `<div class="feedback fail">❌ Incorrecto. La respuesta correcta era: <strong>${q.opts[q.ans]}</strong></div>`)
+    : '';
+
+  return `
+    <div class="score-chip">Puntos: ${state.score} / ${state.current}</div>
+    <div class="prog-wrap"><div class="prog-bar" style="width:${prog}%"></div></div>
+    <div class="q-num">Pregunta ${state.current+1} de 5</div>
+    <div class="q-text">${q.q}</div>
+    <div class="options">${optsHTML}</div>
+    ${feedbackHTML}
+    ${state.answered ? `<button class="btn" id="nextBtn">${state.current < 4 ? 'Siguiente →' : 'Ver resultados 🏁'}</button>` : ''}
+  `;
+}
+
+function resultHTML() {
+  const pct = Math.round((state.score / 5) * 100);
+  const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '🌟' : pct >= 40 ? '👍' : '💪';
+  const msg   = pct >= 80 ? '¡Experto mundialista!' : pct >= 60 ? '¡Muy buen resultado!' : pct >= 40 ? '¡Sigue practicando!' : '¡El fútbol guarda secretos para ti!';
+
+  const lb     = loadLB();
+  const sorted = [...lb].sort((a,b) => b.score - a.score || a.time - b.time);
+  const pos    = sorted.findIndex(e => e.name === state.name && e.score === state.score) + 1;
+  const topRows = sorted.slice(0,8).map((e,i) => {
+    const medals = ['🥇','🥈','🥉'];
+    const isMe = e.name === state.name && e.score === state.score;
+    return `<tr class="${isMe?'me':''}">
+      <td><span class="medal">${medals[i]||i+1}</span></td>
+      <td>${e.name}</td>
+      <td style="text-align:center;font-weight:800;color:#0a5c30;">${e.score}/5</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <h2>${emoji} ${msg}</h2>
+    <div class="result-center">
+      <div class="big-score">${state.score}<span>/5</span></div>
+      <div class="result-meta">${pct}% de aciertos · Posición <strong>#${pos}</strong> en el ranking</div>
+    </div>
+    <div class="lb-title">🏆 Tabla de Líderes</div>
+    ${lb.length === 0
+      ? '<p class="empty">Sé el primero en la tabla.</p>'
+      : `<table><thead><tr><th>#</th><th>Nombre</th><th>Puntos</th></tr></thead><tbody>${topRows}</tbody></table>`}
+    <div class="divider"></div>
+    <button class="btn" id="retryBtn">🔄 Jugar de nuevo</button>
+    <button class="btn btn-outline" id="lbBtnFull" style="margin-top:10px;">📊 Tabla completa</button>
+  `;
+}
+
+function lbHTML() {
+  const lb     = loadLB();
+  const sorted = [...lb].sort((a,b) => b.score - a.score || a.time - b.time);
+  const rows   = sorted.slice(0,20).map((e,i) => {
+    const medals = ['🥇','🥈','🥉'];
+    return `<tr>
+      <td><span class="medal">${medals[i]||i+1}</span></td>
+      <td>${e.name}</td>
+      <td style="text-align:center;font-weight:800;color:#0a5c30;">${e.score}/5</td>
+    </tr>`;
+  }).join('');
+  return `
+    <h2>🏆 Tabla de Líderes</h2>
+    <p class="subtitle">54° Congreso Nacional de Cultivadores de Palma de Aceite 2026</p>
+    ${sorted.length === 0
+      ? '<p class="empty">Aún no hay resultados registrados.</p>'
+      : `<table><thead><tr><th>#</th><th>Nombre</th><th>Puntos</th></tr></thead><tbody>${rows}</tbody></table>`}
+    <div class="divider"></div>
+    <button class="btn" id="backBtn">← Volver al inicio</button>
+    <button class="btn btn-outline" id="clearBtn" style="margin-top:10px;font-size:0.82rem;padding:9px;">🗑️ Borrar todos los puntajes</button>
+  `;
+}
+
+// ── Listeners ────────────────────────────────────────────────────
+function attachListeners() {
+  // 1. Definimos la función de ayuda al principio para evitar el ReferenceError
+  const $ = id => document.getElementById(id);
+  const get = () => { const el = $('nameInput'); return el ? el.value.trim() : ''; };
+
+  // 2. Ahora sí podemos usarla de forma segura
+  $('nameInput') && $('nameInput').addEventListener('keydown', e => { if(e.key==='Enter') startGame(); });
+  $('startBtn')  && $('startBtn').addEventListener('click', startGame);
+  $('lbBtn')     && $('lbBtn').addEventListener('click', () => { state.screen='lb'; render(); });
+  $('lbBtnFull') && $('lbBtnFull').addEventListener('click', () => { state.screen='lb'; render(); });
+  $('nextBtn')   && $('nextBtn').addEventListener('click', nextQ);
+  $('retryBtn')  && $('retryBtn').addEventListener('click', () => { state.screen='welcome'; render(); });
+  $('backBtn')   && $('backBtn').addEventListener('click', () => { state.screen='welcome'; render(); });
+  $('clearBtn')  && $('clearBtn').addEventListener('click', () => {
+    if (confirm('¿Borrar todos los puntajes?')) { localStorage.removeItem(STORAGE_KEY); render(); }
+  });
+  document.querySelectorAll('.opt:not([disabled])').forEach(btn =>
+    btn.addEventListener('click', () => selectOpt(+btn.dataset.i))
+  );
+}
+
+function startGame() {
+  const inp  = document.getElementById('nameInput');
+  const name = inp ? inp.value.trim() : state.name;
+  if (!name) { inp && (inp.style.borderColor='#d94444'); return; }
+  state.name       = name;
+  state.questions  = shuffle(allQuestions).slice(0,5);
+  state.current    = 0;
+  state.score      = 0;
+  state.answered   = false;
+  state.selectedOpt = null;
+  state.screen     = 'quiz';
+  render();
+}
+
+function selectOpt(i) {
+  if (state.answered) return;
+  state.selectedOpt = i;
+  state.answered    = true;
+  if (i === state.questions[state.current].ans) state.score++;
+  render();
+}
+
+function nextQ() {
+  if (state.current < 4) {
+    state.current++;
+    state.answered    = false;
+    state.selectedOpt = null;
+    render();
+  } else {
+    const lb = loadLB();
+    lb.push({ name: state.name, score: state.score, time: Date.now() });
+    saveLB(lb);
+    state.screen = 'result';
+    render();
+  }
+}
+
+render();
+</script>
+</body>
+</html>
