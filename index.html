@@ -739,9 +739,16 @@ if (state.screen === 'lb') render();
 }
 
 async function clearDayHandler() {
-if (!confirm('¿Borrar TODOS los puntajes de hoy? Esto afecta a TODOS los dispositivos y no se puede deshacer.')) return;
+const pwd = prompt('🔒 Ingresa la contraseña para borrar los puntajes de hoy:');
+if (pwd === null) return; // canceló
+if (pwd !== 'extractora') {
+alert('❌ Contraseña incorrecta. No se borraron los puntajes.');
+return;
+}
+if (!confirm('¿Confirmas que deseas borrar TODOS los puntajes de hoy?\nEsto afecta a TODOS los dispositivos y no se puede deshacer.')) return;
 try {
 await fbClearDay(todayKey());
+alert('✅ Puntajes de hoy borrados correctamente.');
 } catch (e) {
 alert('No se pudieron borrar los puntajes: ' + (e.message || e));
 }
